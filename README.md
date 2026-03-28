@@ -80,7 +80,7 @@ app/src/main/
 
 This project is set up to work directly with the migration guide pack. To automate fixes with your AI tool:
 
-1. Clone the **[Android Migration Guide Pack](https://github.com/zebra-oss/android-migration-guide-pack)**
+1. Clone the **[Android Migration Guide Pack](https://github.com/cbolen/Android-Migration-Guide-Pack)**
 2. Copy the context file for your AI tool into this project root:
    - Claude Code → `CLAUDE.md`
    - Cursor → `.cursorrules`
