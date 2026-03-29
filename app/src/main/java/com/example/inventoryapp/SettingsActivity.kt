@@ -1,12 +1,18 @@
 package com.example.inventoryapp
 
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Switch
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.example.inventoryapp.datawedge.DataWedgeManager
+import com.example.inventoryapp.util.StockAlarmScheduler
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -19,7 +25,9 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_settings)
+        applyWindowInsets()
 
         etProfileName = findViewById(R.id.et_dw_profile_name)
         etLowStockThreshold = findViewById(R.id.et_low_stock_threshold)
@@ -74,7 +82,24 @@ class SettingsActivity : AppCompatActivity() {
             .putBoolean("auto_export_enabled", switchAutoExport.isChecked)
             .apply()
 
+        // Schedule or cancel the daily low-stock alarm based on the notifications toggle
+        if (prefs.getBoolean("notifications_enabled", true)) {
+            StockAlarmScheduler.scheduleDailyCheck(this)
+        } else {
+            StockAlarmScheduler.cancel(this)
+        }
+
         Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
         finish()
+    }
+
+    private fun applyWindowInsets() {
+        val content = findViewById<View>(android.R.id.content)
+        ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+            val bars: Insets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(content)
     }
 }

@@ -34,6 +34,11 @@ class SplashActivity : AppCompatActivity() {
         val dwManager = DataWedgeManager(this)
         dwManager.createInventoryProfile()
 
+        // Issue: Handler() uses the deprecated no-arg constructor (removed in API 33).
+        // Fix: replace with Handler(Looper.getMainLooper()).
+        // Issue: custom SplashActivity with timed delay is the old pattern — from API 31 the
+        // system provides a mandatory splash screen. Migrate to androidx.core:core-splashscreen.
+        @Suppress("DEPRECATION")
         Handler().postDelayed({
             val intent = Intent(this, MainActivity::class.java)
             startActivity(intent)

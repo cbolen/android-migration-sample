@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.inventoryapp">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Issue: READ_EXTERNAL_STORAGE should be replaced with granular media permissions (API 33+) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Issue: WRITE_EXTERNAL_STORAGE is ignored on API 30+ for apps targeting API 29+; use MediaStore or SAF instead -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Issue: POST_NOTIFICATIONS permission is missing — required as runtime permission on API 33+ -->
+    <!-- Issue: SCHEDULE_EXACT_ALARM permission is missing — required on API 31+ for setExactAndAllowWhileIdle -->
 
     <application
         android:allowBackup="true"
@@ -16,23 +19,27 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
 
-        <activity android:name=".SplashActivity">
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- Issue: has intent-filter but missing android:exported — crashes install on API 31+ -->
         <activity android:name=".MainActivity">
             <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
+                <action android:name="com.example.inventoryapp.action.INVENTORY" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
+        <!-- Issue: has intent-filter but missing android:exported — crashes install on API 31+ -->
         <activity android:name=".AddItemActivity">
             <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
+                <action android:name="com.example.inventoryapp.action.ADD_ITEM" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
@@ -40,11 +47,39 @@
         <activity android:name=".ExportActivity" />
         <activity android:name=".SettingsActivity" />
 
+        <!-- Issue: has intent-filter but missing android:exported — DataWedge broadcasts from a
+             separate process require exported="true"; this receiver silently never fires on API 31+ -->
         <receiver android:name=".datawedge.ScanReceiver">
             <intent-filter>
+                <action android:name="com.symbol.datawedge.api.RESULT_ACTION" />
                 <action android:name="com.example.inventoryapp.SCAN_RESULT" />
             </intent-filter>
         </receiver>
+
+        <!-- Issue: has intent-filter but missing android:exported — notification trampoline
+             receiver; should be exported="false" since it only handles intents from this app -->
+        <receiver android:name=".LowStockAlertReceiver">
+            <intent-filter>
+                <action android:name="com.example.inventoryapp.action.LOW_STOCK_ALERT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Issue: has intent-filter but missing android:exported -->
+        <receiver android:name=".util.StockCheckReceiver">
+            <intent-filter>
+                <action android:name="com.example.inventoryapp.action.STOCK_CHECK" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

@@ -11,104 +11,70 @@ class InventoryRepository(private val context: Context) {
     private val notificationHelper = NotificationHelper(context)
 
     fun getAllItems(callback: (List<InventoryItem>) -> Unit) {
-        FetchAllTask(database, callback).execute()
+        FetchAllTask(callback).execute()
     }
 
     fun findByBarcode(barcode: String, callback: (InventoryItem?) -> Unit) {
-        FindByBarcodeTask(database, barcode, callback).execute()
+        FindByBarcodeTask(barcode, callback).execute()
     }
 
     fun insertItem(item: InventoryItem, callback: (Boolean) -> Unit) {
-        InsertItemTask(database, item, callback).execute()
+        InsertItemTask(item, callback).execute()
     }
 
     fun updateItem(item: InventoryItem, callback: (Boolean) -> Unit) {
-        UpdateItemTask(database, item, callback).execute()
+        UpdateItemTask(item, callback).execute()
     }
 
     fun checkLowStock() {
-        val prefs = context.getSharedPreferences("inventory_prefs", Context.MODE_PRIVATE)
-        val threshold = prefs.getInt("low_stock_threshold", 5)
-        val notificationsEnabled = prefs.getBoolean("notifications_enabled", true)
-
-        if (!notificationsEnabled) return
-
-        CheckLowStockTask(database, threshold, notificationHelper).execute()
+        CheckLowStockTask().execute()
     }
 
-    private class FetchAllTask(
-        private val db: InventoryDatabase,
+    // Issue: AsyncTask was deprecated in API 30 and removed in API 33.
+    // Fix: replace with Kotlin coroutines (viewModelScope.launch / Dispatchers.IO).
+
+    private inner class FetchAllTask(
         private val callback: (List<InventoryItem>) -> Unit
     ) : AsyncTask<Void, Void, List<InventoryItem>>() {
-
-        override fun doInBackground(vararg params: Void?): List<InventoryItem> {
-            return db.getAllItems()
-        }
-
-        override fun onPostExecute(result: List<InventoryItem>) {
-            callback(result)
-        }
+        override fun doInBackground(vararg p: Void) = database.getAllItems()
+        override fun onPostExecute(result: List<InventoryItem>) = callback(result)
     }
 
-    private class FindByBarcodeTask(
-        private val db: InventoryDatabase,
+    private inner class FindByBarcodeTask(
         private val barcode: String,
         private val callback: (InventoryItem?) -> Unit
     ) : AsyncTask<Void, Void, InventoryItem?>() {
-
-        override fun doInBackground(vararg params: Void?): InventoryItem? {
-            return db.findByBarcode(barcode)
-        }
-
-        override fun onPostExecute(result: InventoryItem?) {
-            callback(result)
-        }
+        override fun doInBackground(vararg p: Void) = database.findByBarcode(barcode)
+        override fun onPostExecute(result: InventoryItem?) = callback(result)
     }
 
-    private class InsertItemTask(
-        private val db: InventoryDatabase,
+    private inner class InsertItemTask(
         private val item: InventoryItem,
         private val callback: (Boolean) -> Unit
-    ) : AsyncTask<InventoryItem, Void, Boolean>() {
-
-        override fun doInBackground(vararg params: InventoryItem?): Boolean {
-            val rowId = db.insertItem(item)
-            return rowId > 0
-        }
-
-        override fun onPostExecute(result: Boolean) {
-            callback(result)
-        }
+    ) : AsyncTask<Void, Void, Boolean>() {
+        override fun doInBackground(vararg p: Void) = database.insertItem(item) > 0
+        override fun onPostExecute(result: Boolean) = callback(result)
     }
 
-    private class UpdateItemTask(
-        private val db: InventoryDatabase,
+    private inner class UpdateItemTask(
         private val item: InventoryItem,
         private val callback: (Boolean) -> Unit
-    ) : AsyncTask<InventoryItem, Void, Boolean>() {
-
-        override fun doInBackground(vararg params: InventoryItem?): Boolean {
-            val rowsAffected = db.updateItem(item)
-            return rowsAffected > 0
-        }
-
-        override fun onPostExecute(result: Boolean) {
-            callback(result)
-        }
+    ) : AsyncTask<Void, Void, Boolean>() {
+        override fun doInBackground(vararg p: Void) = database.updateItem(item) > 0
+        override fun onPostExecute(result: Boolean) = callback(result)
     }
 
-    private class CheckLowStockTask(
-        private val db: InventoryDatabase,
-        private val threshold: Int,
-        private val notificationHelper: NotificationHelper
-    ) : AsyncTask<Void, Void, List<InventoryItem>>() {
-
-        override fun doInBackground(vararg params: Void?): List<InventoryItem> {
-            return db.getLowStockItems(threshold)
+    private inner class CheckLowStockTask : AsyncTask<Void, Void, List<InventoryItem>>() {
+        override fun doInBackground(vararg p: Void): List<InventoryItem> {
+            val prefs = context.getSharedPreferences("inventory_prefs", Context.MODE_PRIVATE)
+            val threshold = prefs.getInt("low_stock_threshold", 5)
+            return database.getLowStockItems(threshold)
         }
 
         override fun onPostExecute(result: List<InventoryItem>) {
-            if (result.isNotEmpty()) {
+            val prefs = context.getSharedPreferences("inventory_prefs", Context.MODE_PRIVATE)
+            val notificationsEnabled = prefs.getBoolean("notifications_enabled", true)
+            if (notificationsEnabled && result.isNotEmpty()) {
                 notificationHelper.showLowStockNotification(result)
             }
         }

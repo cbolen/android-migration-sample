@@ -13,11 +13,14 @@ object StorageHelper {
 
     /**
      * Returns the directory used for CSV exports.
-     * Placed under the public external storage so warehouse managers can access
-     * the files via USB or a file manager app.
+     * Issue: uses Environment.getExternalStorageDirectory() — this path is not writable
+     * on API 30+ without WRITE_EXTERNAL_STORAGE (denied on API 29+ targets).
+     * Fix: replace with context.getExternalFilesDir("exports") or MediaStore.Downloads.
      */
-    fun getExportDirectory(): File {
-        val exportDir = File(Environment.getExternalStorageDirectory(), "$APP_FOLDER/exports")
+    fun getExportDirectory(context: Context): File {
+        @Suppress("DEPRECATION")
+        val rootDir = Environment.getExternalStorageDirectory()
+        val exportDir = File(rootDir, "$APP_FOLDER/exports")
         if (!exportDir.exists()) {
             exportDir.mkdirs()
         }
@@ -26,8 +29,10 @@ object StorageHelper {
 
     /**
      * Returns the directory where item photos are stored.
+     * Issue: hardcoded /sdcard/ path — not portable, not accessible under scoped storage.
+     * Fix: replace with context.getExternalFilesDir(Environment.DIRECTORY_PICTURES).
      */
-    fun getPhotosDirectory(): File {
+    fun getPhotosDirectory(context: Context): File {
         val photosDir = File("/sdcard/$APP_FOLDER/photos")
         if (!photosDir.exists()) {
             photosDir.mkdirs()
@@ -37,8 +42,11 @@ object StorageHelper {
 
     /**
      * Returns the directory for temporary working files (e.g., import staging).
+     * Issue: uses Environment.getExternalStorageDirectory() — same problem as getExportDirectory.
+     * Fix: replace with context.getExternalFilesDir() or context.cacheDir.
      */
-    fun getTempDirectory(): File {
+    fun getTempDirectory(context: Context): File {
+        @Suppress("DEPRECATION")
         val tempDir = File(Environment.getExternalStorageDirectory(), "$APP_FOLDER/temp")
         if (!tempDir.exists()) {
             tempDir.mkdirs()
@@ -57,25 +65,21 @@ object StorageHelper {
 
     fun getExportFile(context: Context): File {
         val fileName = generateExportFileName()
-        return File(getExportDirectory(), fileName)
+        return File(getExportDirectory(context), fileName)
     }
 
-    fun getPhotoFile(barcode: String): File {
-        val photosDir = getPhotosDirectory()
+    fun getPhotoFile(context: Context, barcode: String): File {
+        val photosDir = getPhotosDirectory(context)
         return File(photosDir, generatePhotoFileName(barcode))
     }
 
-    /**
-     * Checks whether the external storage is mounted and writable.
-     */
     fun isExternalStorageWritable(): Boolean {
+        @Suppress("DEPRECATION")
         return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
     }
 
-    /**
-     * Checks whether the external storage is at least readable.
-     */
     fun isExternalStorageReadable(): Boolean {
+        @Suppress("DEPRECATION")
         val state = Environment.getExternalStorageState()
         return state == Environment.MEDIA_MOUNTED || state == Environment.MEDIA_MOUNTED_READ_ONLY
     }

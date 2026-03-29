@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Parcelable
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -19,8 +20,8 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        const val ADD_ITEM_REQUEST = 1001
-        const val EDIT_ITEM_REQUEST = 1002
+        private const val ADD_ITEM_REQUEST = 1001
+        private const val EDIT_ITEM_REQUEST = 1002
     }
 
     private lateinit var recyclerView: RecyclerView
@@ -31,6 +32,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Issue: no edge-to-edge / WindowInsetsCompat handling — content will be clipped by
+        // system bars on API 35+. Fix: call WindowCompat.setDecorFitsSystemWindows(window, false)
+        // and apply ViewCompat.setOnApplyWindowInsetsListener on the root view.
         setContentView(R.layout.activity_main)
 
         repository = InventoryRepository(this)
@@ -40,6 +44,8 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         adapter = InventoryAdapter(mutableListOf()) { item ->
+            // Issue: startActivityForResult is deprecated — replace with registerForActivityResult
+            // using ActivityResultContracts.StartActivityForResult.
             val intent = Intent(this, AddItemActivity::class.java).apply {
                 putExtra("item_id", item.id)
                 putExtra("item_barcode", item.barcode)
@@ -47,25 +53,48 @@ class MainActivity : AppCompatActivity() {
                 putExtra("item_quantity", item.quantity)
                 putExtra("item_location", item.location)
             }
+            @Suppress("DEPRECATION")
             startActivityForResult(intent, EDIT_ITEM_REQUEST)
         }
         recyclerView.adapter = adapter
 
         val fab = findViewById<FloatingActionButton>(R.id.fab_add)
         fab.setOnClickListener {
-            val intent = Intent(this, AddItemActivity::class.java)
-            startActivityForResult(intent, ADD_ITEM_REQUEST)
+            // Issue: startActivityForResult is deprecated.
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent(this, AddItemActivity::class.java), ADD_ITEM_REQUEST)
         }
 
         loadInventory()
         setupScanReceiver()
     }
 
+    // Issue: onActivityResult is deprecated — remove this override and handle results in the
+    // ActivityResultCallback registered with registerForActivityResult.
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK) return
+        val item = data?.getParcelableExtraCompat<InventoryItem>("new_item") ?: return
+        when (requestCode) {
+            ADD_ITEM_REQUEST -> repository.insertItem(item) { success ->
+                if (success) {
+                    loadInventory()
+                    Toast.makeText(this, "Item added", Toast.LENGTH_SHORT).show()
+                }
+            }
+            EDIT_ITEM_REQUEST -> repository.updateItem(item) { success ->
+                if (success) {
+                    loadInventory()
+                    Toast.makeText(this, "Item updated", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     private fun loadInventory() {
         repository.getAllItems { items ->
-            runOnUiThread {
-                adapter.updateItems(items)
-            }
+            adapter.updateItems(items)
         }
     }
 
@@ -76,30 +105,35 @@ class MainActivity : AppCompatActivity() {
 
         val filter = IntentFilter()
         filter.addAction("com.symbol.datawedge.api.RESULT_ACTION")
-        filter.addAction("com.example.inventoryapp.SCAN_RESULT")
+        filter.addAction(ScanReceiver.ACTION_SCAN_RESULT)
         filter.addCategory(Intent.CATEGORY_DEFAULT)
 
+        // Issue: registerReceiver called without RECEIVER_NOT_EXPORTED or RECEIVER_EXPORTED flag
+        // — on API 34+, dynamically registered receivers that omit the export flag throw an
+        // exception at runtime. Fix: use ContextCompat.registerReceiver with
+        // ContextCompat.RECEIVER_NOT_EXPORTED (DataWedge broadcasts are from a system service
+        // but targeted at this app — use NOT_EXPORTED).
+        @Suppress("UnspecifiedRegisterReceiverFlag")
         registerReceiver(scanReceiver, filter)
         dwManager.enableScanning()
     }
 
     private fun handleScannedBarcode(barcode: String, labelType: String) {
         repository.findByBarcode(barcode) { item ->
-            runOnUiThread {
-                if (item != null) {
-                    Toast.makeText(
-                        this,
-                        "Found: ${item.name} — Qty: ${item.quantity} @ ${item.location}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    highlightItem(item)
-                } else {
-                    val intent = Intent(this, AddItemActivity::class.java).apply {
-                        putExtra("item_barcode", barcode)
-                        putExtra("label_type", labelType)
-                    }
-                    startActivityForResult(intent, ADD_ITEM_REQUEST)
+            if (item != null) {
+                Toast.makeText(
+                    this,
+                    "Found: ${item.name} — Qty: ${item.quantity} @ ${item.location}",
+                    Toast.LENGTH_LONG
+                ).show()
+                highlightItem(item)
+            } else {
+                val intent = Intent(this, AddItemActivity::class.java).apply {
+                    putExtra("item_barcode", barcode)
+                    putExtra("label_type", labelType)
                 }
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, ADD_ITEM_REQUEST)
             }
         }
     }
@@ -114,49 +148,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            ADD_ITEM_REQUEST -> {
-                if (resultCode == RESULT_OK) {
-                    val newItem = data?.getParcelableExtra<InventoryItem>("new_item")
-                    if (newItem != null) {
-                        repository.insertItem(newItem) { success ->
-                            if (success) {
-                                runOnUiThread {
-                                    loadInventory()
-                                    Toast.makeText(this, "Item added", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            EDIT_ITEM_REQUEST -> {
-                if (resultCode == RESULT_OK) {
-                    val updatedItem = data?.getParcelableExtra<InventoryItem>("new_item")
-                    if (updatedItem != null) {
-                        repository.updateItem(updatedItem) { success ->
-                            if (success) {
-                                runOnUiThread {
-                                    loadInventory()
-                                    Toast.makeText(this, "Item updated", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    // Issue: onBackPressed() is deprecated from API 33 and the override is removed in future
+    // versions. Fix: replace with onBackPressedDispatcher.addCallback(this, OnBackPressedCallback).
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         AlertDialog.Builder(this)
             .setTitle("Exit")
             .setMessage("Are you sure you want to exit the inventory app?")
             .setPositiveButton("Exit") { _, _ ->
                 dwManager.disableScanning()
-                super.onBackPressed()
+                finish()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -194,5 +195,10 @@ class MainActivity : AppCompatActivity() {
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    private inline fun <reified T : Parcelable> Intent.getParcelableExtraCompat(key: String): T? {
+        @Suppress("DEPRECATION")
+        return getParcelableExtra(key)
     }
 }
