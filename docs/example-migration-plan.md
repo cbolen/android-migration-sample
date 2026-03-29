@@ -305,22 +305,13 @@ to accept broadcasts from arbitrary senders. Fix is covered by B-7.
 
 ---
 
-### Z-3 — Hardcoded storage paths break scoped storage on Zebra devices
-**Files:** `StorageHelper.kt` line 36; `ExportActivity.kt` line 110
-
-On Zebra TC/MC/EC devices running Android 11+, `/sdcard/InventoryApp/` is inaccessible without
-`MANAGE_EXTERNAL_STORAGE` (which must not be requested for standard patterns). Replace with
-`getExternalFilesDir()` as described in R-3.
-
----
-
-### Z-4 — DataWedge profile configuration: no issues found
+### Z-3 — DataWedge profile configuration: no issues found
 `DataWedgeManager.kt` correctly uses the DataWedge Intent API (`com.symbol.datawedge.api.ACTION`
 + `SET_CONFIG`). EMDK is not used anywhere in the project. No changes required.
 
 ---
 
-### Z-5 — AI Suite eligibility: not yet applicable
+### Z-4 — AI Suite eligibility: not yet applicable
 The Zebra AI Suite requires API 34+. Once the app reaches `targetSdk 34`, AI barcode recognition
 (`EntityTrackerAnalyzer`) becomes available for advanced SKU capture scenarios. This is an
 enhancement opportunity, not a migration requirement.
@@ -396,4 +387,3 @@ The phases below map to the structure in `docs/Migration/migration-guide.md`.
 | R-9 | Required | — | `build.gradle` | `compileSdk`/`targetSdk` at 30 |
 | Z-1 | Zebra | 31 | `AndroidManifest.xml` | `ScanReceiver` needs `exported="true"` |
 | Z-2 | Zebra | 33 | `MainActivity.kt` | Dynamic DataWedge receiver needs `NOT_EXPORTED` flag |
-| Z-3 | Zebra | 30+ | `StorageHelper.kt`, `ExportActivity.kt` | Hardcoded paths fail under scoped storage on-device |
