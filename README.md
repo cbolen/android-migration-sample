@@ -30,6 +30,20 @@ Play Store and before several deprecated APIs were removed. It runs fine on Andr
 devices, but will encounter runtime crashes, permission denials, and compatibility warnings on
 Android 12 and above.
 
+## Building the Project
+
+This project targets `compileSdkVersion 30` and uses AGP 7.3 / Gradle 7.5, which requires **JDK 17**.
+If you have JDK 21 set as your Gradle JVM the sync will fail with a version incompatibility error.
+
+**To set JDK 17 in Android Studio:**
+
+1. **File → Settings → Build, Execution, Deployment → Build Tools → Gradle**
+2. Under **Gradle JDK**, select JDK 17
+3. If not listed, choose **Download JDK...** → select **Temurin 17** → Download
+4. Click OK and sync
+
+This is a per-project setting and will not affect your other projects.
+
 ## Using This App With the Migration Guide
 
 This project is designed as a hands-on exercise companion for the **Android 11 → 15 Migration Guide
